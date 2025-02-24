@@ -23,13 +23,45 @@
 
 #include <stdlib.h>
 
+/* Include LED driver */
+#include "leds.h"
+#include "timer.h"
+#include "lsm6dsl.h"
+
 int dataAvailable = 0;
 
 SPI_HandleTypeDef hspi3;
 
+// Redefine the libc _write() function so you can use printf in your code
+int _write(int file, char *ptr, int len) {
+    int i = 0;
+    for (i = 0; i < len; i++) {
+        ITM_SendChar(*ptr++);
+    }
+    return len;
+}
+
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI3_Init(void);
+void you_lost_it(int16_t* xyz);
+
+#define OFFSET_THRESH 4000
+
+// Patterns for each LED
+static int led2[] = {2,0,2,0, 0,2,0,0,0,0,2,2, 0,0,0,0};
+static int led1[] = {0,1,0,1, 0,0,1,1,0,0,0,0, 0,0,0,0};
+
+static volatile int interruptProcs = 0;
+static volatile int TIM2start = 0;
+static volatile int TIM3start = 0;
+static volatile int led_interupt = 0;
+static volatile int on_off = 0;
+static volatile int minsLost = 0;
+static volatile int lights = 0;
+static volatile uint8_t highbit = 0x2;
+static volatile uint8_t lowbit = 0x1;
+
 
 /**
   * @brief  The application entry point.
@@ -47,6 +79,15 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI3_Init();
 
+  // Our peripheral configurables
+  leds_init();
+  timer_init(TIM2);
+  timer_init(TIM3);
+  timer_set_ms(TIM3, 50);
+  //timer_set_ms(TIM2, 60000);
+  timer_set_ms(TIM2, 1000);
+  lsm6dsl_init();
+
   //RESET BLE MODULE
   HAL_GPIO_WritePin(BLE_RESET_GPIO_Port,BLE_RESET_Pin,GPIO_PIN_RESET);
   HAL_Delay(10);
@@ -58,20 +99,85 @@ int main(void)
 
   uint8_t nonDiscoverable = 0;
 
+  int16_t prev_xyz[3] = {0,0,0};
+
   while (1)
   {
 	  if(!nonDiscoverable && HAL_GPIO_ReadPin(BLE_INT_GPIO_Port,BLE_INT_Pin)){
 	    catchBLE();
 	  }else{
-		  HAL_Delay(1000);
+		  //HAL_Delay(1000);
+		  you_lost_it(prev_xyz);
 		  // Send a string to the NORDIC UART service, remember to not include the newline
-		  unsigned char test_str[] = "youlostit BLE test";
-		  updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(test_str)-1, test_str);
+		  //unsigned char test_str[] = "youlostit BLE test";
+		  //updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(test_str)-1, test_str);
 	  }
 	  // Wait for interrupt, only uncomment if low power is needed
 	  //__WFI();
   }
 }
+void you_lost_it(int16_t* xyz){
+	int16_t prev_x = xyz[0];
+	int16_t prev_y = xyz[1];
+	int16_t prev_z = xyz[2];
+	int16_t x = 0;
+	int16_t y = 0;
+	int16_t z = 0;
+	lsm6dsl_read_xyz(&x,&y, &z);
+	int16_t diff_x = abs(x) - abs(prev_x);
+	int16_t diff_y = abs(y) - abs(prev_y);
+	int16_t diff_z = abs(z) - abs(prev_z);
+
+	// keep track of how many times that it moved
+	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) {
+		timer_reset(TIM2);
+		led_interupt = 0;
+		minsLost = 0;
+		leds_set(0);
+	}
+	if (led_interupt) {
+		//HAL_Delay(10);
+		leds_set(lights);
+		unsigned char message[21]; //21 characters seems like the max
+		snprintf((char*)message, 21, "Tag lost for %d mins", minsLost);
+		updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
+	}
+	xyz[0] = x;
+	xyz[1] = y;
+	xyz[2] = z;
+}
+// Timer to keep track of how long it has been lost and set the blinking
+void TIM2_IRQHandler(void)
+{
+	if (TIM2start == 0) {
+		TIM2start++;
+		TIM2->SR &= ~TIM_SR_UIF;
+		return;
+	}
+	minsLost++;
+	for (int i = 0; i < 3; i++) {
+		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
+		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
+	}
+	led_interupt = 1;
+
+	// Reset the interrupt bit
+	TIM2->SR &= ~TIM_SR_UIF;
+}
+
+// set the leds blinking pattern
+void TIM3_IRQHandler(void) {
+	if (!TIM3start) {
+		TIM3start = 1;
+		TIM3->SR &= ~TIM_SR_UIF;
+		return;
+	}
+	lights = led1[on_off] + led2[on_off];
+	on_off = (on_off + 1) % 16;
+	TIM3->SR &= ~TIM_SR_UIF;
+}
+
+
 
 /**
   * @brief System Clock Configuration
