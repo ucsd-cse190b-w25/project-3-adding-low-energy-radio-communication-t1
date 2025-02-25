@@ -31,7 +31,9 @@ void timer_init(TIM_TypeDef* timer)
 	timer->CNT &= 0;
 
 	// Set the prescalar to 3999 since 1/(3999+1) = 4000 for 1 ms
-	timer->PSC = 3999;
+//	timer->PSC = 3999;
+	timer->PSC = 7999; // adjust it for an 8mhz clock
+
 
 	// reset the status of the timer
 	timer->SR &= ~TIM_SR_UIF;
