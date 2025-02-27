@@ -61,6 +61,7 @@ static volatile int minsLost = 0;
 static volatile int lights = 0;
 static volatile uint8_t highbit = 0x2;
 static volatile uint8_t lowbit = 0x1;
+static volatile int sendMessage = 0;
 
 
 /**
@@ -83,7 +84,7 @@ int main(void)
   leds_init();
   timer_init(TIM2);
   timer_init(TIM3);
-  timer_set_ms(TIM3, 50);
+  timer_set_ms(TIM3, 10000); // 10 second delay
   //timer_set_ms(TIM2, 60000);
   timer_set_ms(TIM2, 1000);
   lsm6dsl_init();
@@ -131,16 +132,24 @@ void you_lost_it(int16_t* xyz){
 	// keep track of how many times that it moved
 	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) {
 		timer_reset(TIM2);
+		timer_reset(TIM3);
+		sendMessage = 0;
 		led_interupt = 0;
 		minsLost = 0;
 		leds_set(0);
+		//disconnectBLE();
+		//setDiscoverability(0);
 	}
 	if (led_interupt) {
 		//HAL_Delay(10);
+		//setDiscoverability(1);
 		leds_set(lights);
-		unsigned char message[21]; //21 characters seems like the max
-		snprintf((char*)message, 21, "Tag lost for %d mins", minsLost);
-		updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
+		unsigned char message[20]; //21 characters seems like the max
+		if (sendMessage) {
+			snprintf((char*)message, 20, "Mins lost %d", minsLost);
+			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
+			sendMessage = 0;
+		}
 	}
 	xyz[0] = x;
 	xyz[1] = y;
@@ -172,8 +181,9 @@ void TIM3_IRQHandler(void) {
 		TIM3->SR &= ~TIM_SR_UIF;
 		return;
 	}
-	lights = led1[on_off] + led2[on_off];
-	on_off = (on_off + 1) % 16;
+//	lights = led1[on_off] + led2[on_off];
+//	on_off = (on_off + 1) % 16;
+	sendMessage = 1;
 	TIM3->SR &= ~TIM_SR_UIF;
 }
 
