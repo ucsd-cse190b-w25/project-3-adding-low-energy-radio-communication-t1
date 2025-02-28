@@ -85,7 +85,7 @@ int main(void)
   timer_init(TIM2);
   timer_init(TIM3);
   timer_set_ms(TIM3, 10000); // 10 second delay
-  //timer_set_ms(TIM2, 60000);
+//  timer_set_ms(TIM2, 60000);
   timer_set_ms(TIM2, 1000);
   lsm6dsl_init();
 
@@ -130,23 +130,23 @@ void you_lost_it(int16_t* xyz){
 	int16_t diff_z = abs(z) - abs(prev_z);
 
 	// keep track of how many times that it moved
-	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) {
+	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) { // This is checking for when it moves
 		timer_reset(TIM2);
 		timer_reset(TIM3);
 		sendMessage = 0;
 		led_interupt = 0;
 		minsLost = 0;
 		leds_set(0);
-		//disconnectBLE();
-		//setDiscoverability(0);
+		disconnectBLE();
+		setDiscoverability(0);
 	}
-	if (led_interupt) {
+	if (led_interupt && minsLost >= 60) { // This is when it is lost for 60s
 		//HAL_Delay(10);
-		//setDiscoverability(1);
+		setDiscoverability(1);
 		leds_set(lights);
-		unsigned char message[20]; //21 characters seems like the max
+		unsigned char message[20] = ""; //21 characters seems like the max
 		if (sendMessage) {
-			snprintf((char*)message, 20, "Mins lost %d", minsLost);
+			snprintf((char*)message, 20, "Seconds lost %d", minsLost);
 			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
 			sendMessage = 0;
 		}
