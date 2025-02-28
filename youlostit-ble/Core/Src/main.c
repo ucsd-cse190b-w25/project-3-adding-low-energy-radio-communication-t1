@@ -146,7 +146,7 @@ void you_lost_it(int16_t* xyz){
 		leds_set(lights);
 		unsigned char message[20] = ""; //21 characters seems like the max
 		if (sendMessage) {
-			snprintf((char*)message, 20, "Secs lost %d", minsLost);
+			snprintf((char*)message, 20, "Secs lost %d", minsLost-60);
 			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
 			sendMessage = 0;
 		}
