@@ -31,9 +31,15 @@ void timer_init(TIM_TypeDef* timer)
 	timer->CNT &= 0;
 
 	// Set the prescalar to 3999 since 1/(3999+1) = 4000 for 1 ms
-//	timer->PSC = 3999;
+//	timer->PSC = 3999; // adjust for 4mhz clock
 	timer->PSC = 7999; // adjust it for an 8mhz clock
-
+//	timer->PSC = 99; // adjust for 100 khz clock
+//	timer->PSC = 199; // adjust for 200khz clock
+//	timer->PSC = 399; // adjust for 400khz clock
+//	timer->PSC = 799; // adjust for 800khz clock (minimum working)
+//	timer->PSC = 999; // adjust for 1mhz clock
+//	timer->PSC = 1999; // adjust for 2mhz clock
+//	timer->PSC = 19999; //
 
 	// reset the status of the timer
 	timer->SR &= ~TIM_SR_UIF;
@@ -59,3 +65,13 @@ void timer_set_ms(TIM_TypeDef* timer, uint16_t period_ms)
   	// Set the reload time of the timer
 	timer->ARR = period_ms - 1;
 }
+
+void timer_set_presc(TIM_TypeDef* timer, uint16_t presc) {
+	timer->PSC = presc;
+}
+
+void timer_set_arr(TIM_TypeDef* timer, uint16_t arr) {
+	timer->CNT &= 0;
+	timer->ARR = arr;
+}
+

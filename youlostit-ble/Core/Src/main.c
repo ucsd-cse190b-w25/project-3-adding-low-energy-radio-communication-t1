@@ -19,6 +19,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 //#include "ble_commands.h"
+/*
+ * 172, 165, 166, 405,
+ * https://community.st.com/t5/mems-sensors/lsm6dsl-interrupt-generation-interrupts-constantly-fire/td-p/616753
+ * https://medium.com/@yashodhalakshana/stm32l4-low-power-modes-with-different-wake-up-sources-260b56c48933
+ */
 #include "ble.h"
 
 #include <stdlib.h>
@@ -45,6 +50,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI3_Init(void);
 void you_lost_it(int16_t* xyz);
+void new_lost_it(void);
 
 #define OFFSET_THRESH 4000
 
@@ -62,6 +68,8 @@ static volatile int lights = 0;
 static volatile uint8_t highbit = 0x2;
 static volatile uint8_t lowbit = 0x1;
 static volatile int sendMessage = 0;
+static volatile int checkAccel = 0;
+static volatile int readAccel = 0;
 
 
 /**
@@ -85,9 +93,16 @@ int main(void)
   timer_init(TIM2);
   timer_init(TIM3);
   timer_set_ms(TIM3, 10000); // 10 second delay
-//  timer_set_ms(TIM2, 60000);
-  timer_set_ms(TIM2, 1000);
+  timer_set_ms(TIM2, 5000);
+//  timer_set_arr(TIM3, 1600);
+//  timer_set_arr(TIM2, 160);
+
   lsm6dsl_init();
+//  printf("work\n");
+  // enable exti event generating things for accelerometer
+  // accelerometer is EXTI11
+//  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+//  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
 
   //RESET BLE MODULE
   HAL_GPIO_WritePin(BLE_RESET_GPIO_Port,BLE_RESET_Pin,GPIO_PIN_RESET);
@@ -97,26 +112,59 @@ int main(void)
   ble_init();
 
   HAL_Delay(10);
+  __enable_irq();
 
   uint8_t nonDiscoverable = 0;
 
   int16_t prev_xyz[3] = {0,0,0};
 
+
   while (1)
   {
+	  RCC->CR &= ~RCC_CR_MSIRANGE;
+	  RCC->CR |= RCC_CR_MSIRANGE_0;
+//	  timer_set_arr(TIM3, 50);
+//	  timer_set_arr(TIM2, 5);
+	  timer_set_presc(TIM2, 99);
+	  timer_set_presc(TIM3, 99);
+	  PWR->CR1 |= PWR_CR1_LPR;
+
 	  if(!nonDiscoverable && HAL_GPIO_ReadPin(BLE_INT_GPIO_Port,BLE_INT_Pin)){
-	    catchBLE();
+		  PWR->CR1 &= ~PWR_CR1_LPR;
+		  while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+		  RCC->CR &= ~RCC_CR_MSIRANGE;
+		  RCC->CR |= RCC_CR_MSIRANGE_7;
+//		  timer_set_arr(TIM3, 4000);
+//		  timer_set_arr(TIM2, 400);
+		  timer_set_presc(TIM2, 7999);
+		  timer_set_presc(TIM3, 7999);
+		  catchBLE();
 	  }else{
-		  //HAL_Delay(1000);
-		  you_lost_it(prev_xyz);
-		  // Send a string to the NORDIC UART service, remember to not include the newline
-		  //unsigned char test_str[] = "youlostit BLE test";
-		  //updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(test_str)-1, test_str);
+		  if (checkAccel) {
+			  you_lost_it(prev_xyz);
+//			  new_lost_it();
+			  checkAccel = 0;
+		  }
 	  }
+// HAL_SuspendTick() and HAL_ResumeTick() good?
+//	  if using STOP mode then you have to use an EXTI from accelerometer?
+//	  PWR->CR1 |= PWR_CR1_LPMS_STOP2;
+//	  SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
 	  // Wait for interrupt, only uncomment if low power is needed
-	  //__WFI();
+//	  __enable_irq();
+	  HAL_SuspendTick();
+//	  PWR->CR1 |= PWR_CR1_LPMS_STOP2;
+	  __WFI();
+//	  HAL_PWREx_EnterSTOP2Mode(PWR_SLEEPENTRY_WFI);
+//	  leds_set(1);
+	  HAL_ResumeTick();
+
+
+
+//	  SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
   }
 }
+
 void you_lost_it(int16_t* xyz){
 	int16_t prev_x = xyz[0];
 	int16_t prev_y = xyz[1];
@@ -129,6 +177,7 @@ void you_lost_it(int16_t* xyz){
 	int16_t diff_y = abs(y) - abs(prev_y);
 	int16_t diff_z = abs(z) - abs(prev_z);
 
+    //leds_set(lights);
 	// keep track of how many times that it moved
 	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) { // This is checking for when it moves
 		timer_reset(TIM2);
@@ -136,17 +185,32 @@ void you_lost_it(int16_t* xyz){
 		sendMessage = 0;
 		led_interupt = 0;
 		minsLost = 0;
-		leds_set(0);
+//		leds_set(0);
+		PWR->CR1 &= ~PWR_CR1_LPR;
+		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+		RCC->CR &= ~RCC_CR_MSIRANGE;
+		RCC->CR |= RCC_CR_MSIRANGE_7;
+//		timer_set_arr(TIM3, 4000);
+//		timer_set_arr(TIM2, 400);
+		timer_set_presc(TIM2, 7999);
+		timer_set_presc(TIM3, 7999);
 		disconnectBLE();
 		setDiscoverability(0);
 	}
-	if (led_interupt && minsLost >= 60) { // This is when it is lost for 60s
-		//HAL_Delay(10);
+	if (led_interupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
+		PWR->CR1 &= ~PWR_CR1_LPR;
+		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+		RCC->CR &= ~RCC_CR_MSIRANGE;
+		RCC->CR |= RCC_CR_MSIRANGE_7;
+//		timer_set_arr(TIM3, 4000);
+//		timer_set_arr(TIM2, 400);
+		timer_set_presc(TIM2, 7999);
+		timer_set_presc(TIM3, 7999);
 		setDiscoverability(1);
-		leds_set(lights);
+//		leds_set(lights);
 		unsigned char message[20] = ""; //21 characters seems like the max
 		if (sendMessage) {
-			snprintf((char*)message, 20, "Secs lost %d", minsLost-60);
+			snprintf((char*)message, 20, "Secs lost %d", minsLost-10);
 			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
 			sendMessage = 0;
 		}
@@ -154,6 +218,43 @@ void you_lost_it(int16_t* xyz){
 	xyz[0] = x;
 	xyz[1] = y;
 	xyz[2] = z;
+}
+void new_lost_it() {
+	if (readAccel) {
+		timer_reset(TIM2);
+		timer_reset(TIM3);
+		sendMessage = 0;
+		led_interupt = 0;
+		minsLost = 0;
+//		leds_set(0);
+		PWR->CR1 &= ~PWR_CR1_LPR;
+		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+		RCC->CR &= ~RCC_CR_MSIRANGE;
+		RCC->CR |= RCC_CR_MSIRANGE_7;
+		timer_set_presc(TIM2, 7999);
+		timer_set_presc(TIM3, 7999);
+		disconnectBLE();
+		setDiscoverability(0);
+		readAccel = 0;
+	}
+
+	if (led_interupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
+		//HAL_Delay(10);
+		PWR->CR1 &= ~PWR_CR1_LPR;
+		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+		RCC->CR &= ~RCC_CR_MSIRANGE;
+		RCC->CR |= RCC_CR_MSIRANGE_7;
+		timer_set_presc(TIM2, 7999);
+		timer_set_presc(TIM3, 7999);
+		setDiscoverability(1);
+//		leds_set(lights);
+		unsigned char message[20] = ""; //21 characters seems like the max
+		if (sendMessage) {
+			snprintf((char*)message, 20, "Secs lost %d", minsLost-60);
+			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
+			sendMessage = 0;
+		}
+	}
 }
 // Timer to keep track of how long it has been lost and set the blinking
 void TIM2_IRQHandler(void)
@@ -163,13 +264,16 @@ void TIM2_IRQHandler(void)
 		TIM2->SR &= ~TIM_SR_UIF;
 		return;
 	}
-	minsLost++;
-	for (int i = 0; i < 3; i++) {
-		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
-		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
-	}
+	minsLost+= 5;
+//	for (int i = 0; i < 3; i++) {
+//		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
+//		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
+//	}
+//	lights = led1[on_off] + led2[on_off];
+//	on_off = (on_off + 1) % 16;
+//	leds_set(1);
 	led_interupt = 1;
-
+	checkAccel = 1;
 	// Reset the interrupt bit
 	TIM2->SR &= ~TIM_SR_UIF;
 }
@@ -183,8 +287,55 @@ void TIM3_IRQHandler(void) {
 	}
 //	lights = led1[on_off] + led2[on_off];
 //	on_off = (on_off + 1) % 16;
+//	leds_set(2);
 	sendMessage = 1;
 	TIM3->SR &= ~TIM_SR_UIF;
+}
+void EXTI15_10_IRQHandler(void) {
+//    leds_set(3);
+
+    if (EXTI->PR1 & EXTI_PR1_PIF11) {
+    	readAccel = 1;
+//    	leds_set(3);
+    	printf("accel interrupt");
+    	EXTI->PR1 |= EXTI_PR1_PIF11;
+    }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == GPIO_PIN_11) {
+		readAccel = 1;
+//		leds_set(3);
+	}
+}
+
+void check_clocks() {
+    uint32_t sysclk = HAL_RCC_GetSysClockFreq();  // Get SYSCLK frequency
+    uint32_t hclk = HAL_RCC_GetHCLKFreq();        // Get AHB bus frequency
+    uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();      // Get APB1 peripheral frequency
+    uint32_t pclk2 = HAL_RCC_GetPCLK2Freq();      // Get APB2 peripheral frequency
+
+    printf("System Clock (SYSCLK): %lu Hz\n", sysclk);
+    printf("AHB Clock (HCLK): %lu Hz\n", hclk);
+    printf("APB1 Clock (PCLK1): %lu Hz\n", pclk1);
+    printf("APB2 Clock (PCLK2): %lu Hz\n", pclk2);
+
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_MSIRDY)) {
+        printf("MSI is enabled\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY)) {
+        printf("HSI16 is enabled\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSIRDY)) {
+        printf("LSI is enabled\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_HSERDY)) {
+        printf("HSE is enabled\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSERDY)) {
+        printf("LSE is enabled\n");
+    }
+
 }
 
 
@@ -215,6 +366,7 @@ void SystemClock_Config(void)
   // This lines changes system clock frequency
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_7; // MSIRANGE_7 is 8 mhz
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+//  __HAL_RCC_HSI_DISABLE();
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();

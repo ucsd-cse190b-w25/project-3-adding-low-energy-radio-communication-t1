@@ -14,5 +14,7 @@
 void timer_init(TIM_TypeDef* timer);
 void timer_reset(TIM_TypeDef* timer);
 void timer_set_ms(TIM_TypeDef* timer, uint16_t period_ms);
+void timer_set_presc(TIM_TypeDef* timer, uint16_t presc);
+void timer_set_arr(TIM_TypeDef* timer, uint16_t arr);
 
 #endif /* TIMER_H_ */

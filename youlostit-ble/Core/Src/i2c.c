@@ -92,6 +92,22 @@ void i2c_init() {
 	I2C2->TIMINGR &= ~I2C_TIMINGR_SCLDEL;
 	I2C2->TIMINGR |= (0x4 << I2C_TIMINGR_SCLDEL_Pos);
 
+//	// works for 800 khz
+//	I2C2->TIMINGR |= (0 << I2C_TIMINGR_PRESC_Pos);//(0 << I2C_TIMINGR_PRESC_Pos);
+//	// low cycles
+//	I2C2->TIMINGR &= ~I2C_TIMINGR_SCLL;
+//	I2C2->TIMINGR |= (0x6 << I2C_TIMINGR_SCLL_Pos);
+//	// high cycles
+//	I2C2->TIMINGR &= ~I2C_TIMINGR_SCLH;
+//	I2C2->TIMINGR |= (0x3 << I2C_TIMINGR_SCLH_Pos);
+//	// data hold cycles
+//	I2C2->TIMINGR &= ~I2C_TIMINGR_SDADEL;
+//	I2C2->TIMINGR |= (0x0 << I2C_TIMINGR_SDADEL_Pos);
+//	// data setup cycles
+//	I2C2->TIMINGR &= ~I2C_TIMINGR_SCLDEL;
+//	I2C2->TIMINGR |= (0x1 << I2C_TIMINGR_SCLDEL_Pos);
+
+
 
 	// Set slave byte control
 	//I2C2->CR1 |= I2C_CR1_SBC;
