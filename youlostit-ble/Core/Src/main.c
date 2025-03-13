@@ -99,7 +99,7 @@ int main(void)
   // Our peripheral configurables
   leds_init();
   lptim_init(LPTIM1);
-  lptim_set_sec(LPTIM1, 1);
+  lptim_set_sec(LPTIM1, 10);
 //  timer_init(TIM2);
 //  timer_init(TIM3);
 //  timer_set_ms(TIM3, 10000); // 10 second delay
@@ -126,17 +126,17 @@ int main(void)
 
   while (1)
   {
-	  RCC->CR &= ~RCC_CR_MSIRANGE;
-	  RCC->CR |= RCC_CR_MSIRANGE_0;
+//	  RCC->CR &= ~RCC_CR_MSIRANGE;
+//	  RCC->CR |= RCC_CR_MSIRANGE_0;
 //	  timer_set_presc(TIM2, 99);
 //	  timer_set_presc(TIM3, 99);
-	  PWR->CR1 |= PWR_CR1_LPR;
+//	  PWR->CR1 |= PWR_CR1_LPR;
 
 	  if(!nonDiscoverable && HAL_GPIO_ReadPin(BLE_INT_GPIO_Port,BLE_INT_Pin)){
-		  PWR->CR1 &= ~PWR_CR1_LPR;
-		  while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
-		  RCC->CR &= ~RCC_CR_MSIRANGE;
-		  RCC->CR |= RCC_CR_MSIRANGE_7;
+//		  PWR->CR1 &= ~PWR_CR1_LPR;
+//		  while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+//		  RCC->CR &= ~RCC_CR_MSIRANGE;
+//		  RCC->CR |= RCC_CR_MSIRANGE_7;
 //		  timer_set_presc(TIM2, 7999);
 //		  timer_set_presc(TIM3, 7999);
 //		  ble_init();
@@ -182,27 +182,28 @@ void you_lost_it(int16_t* xyz){
     //leds_set(lights);
 	// keep track of how many times that it moved
 	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) { // This is checking for when it moves
-		lptim_reset(LPTIM1);
+//		lptim_reset(LPTIM1);
 //		timer_reset(TIM2);
 //		timer_reset(TIM3);
 		sendMessage = 0;
 		led_interrupt = 0;
 		minsLost = 0;
 //		leds_set(0);
-		PWR->CR1 &= ~PWR_CR1_LPR;
-		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
-		RCC->CR &= ~RCC_CR_MSIRANGE;
-		RCC->CR |= RCC_CR_MSIRANGE_7;
+//		PWR->CR1 &= ~PWR_CR1_LPR;
+//		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+//		RCC->CR &= ~RCC_CR_MSIRANGE;
+//		RCC->CR |= RCC_CR_MSIRANGE_7;
 //		timer_set_presc(TIM2, 7999);
 //		timer_set_presc(TIM3, 7999);
 		disconnectBLE();
 		setDiscoverability(0);
+//		standbyBle();
 	}
 	if (led_interrupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
-		PWR->CR1 &= ~PWR_CR1_LPR;
-		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
-		RCC->CR &= ~RCC_CR_MSIRANGE;
-		RCC->CR |= RCC_CR_MSIRANGE_7;
+//		PWR->CR1 &= ~PWR_CR1_LPR;
+//		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
+//		RCC->CR &= ~RCC_CR_MSIRANGE;
+//		RCC->CR |= RCC_CR_MSIRANGE_7;
 //		timer_set_presc(TIM2, 7999);
 //		timer_set_presc(TIM3, 7999);
 		setDiscoverability(1);
@@ -297,13 +298,14 @@ void new_lost_it() {
 
 void LPTIM1_IRQHandler(void) {
 	leds_set(1);
-	minsLost+= 1;
+	minsLost+= 10;
 	led_interrupt = 1;
 	checkAccel = 1;
 	if (minsLost >= timeTillLost && ((minsLost % 10) == 0)) {
+		leds_set(3);
 		sendMessage = 1;
 	}
-	LPTIM1->ISR |= LPTIM_ICR_ARRMCF;
+	LPTIM1->ICR |= LPTIM_ICR_ARRMCF;
 }
 
 void EXTI15_10_IRQHandler(void) {

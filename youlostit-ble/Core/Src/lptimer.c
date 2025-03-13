@@ -25,6 +25,9 @@ void lptim_init(LPTIM_TypeDef* lptim) {
 	RCC->APB1RSTR1 &= ~RCC_APB1RSTR1_LPTIM1RST;
 	RCC->APB1SMENR1 |= RCC_APB1SMENR1_LPTIM1SMEN;
 
+	lptim->CR &= ~LPTIM_CR_ENABLE;
+	for (volatile int i = 0;i < 10; i++);
+
 	// enable interrupts from auto reload match
 	lptim->IER |= LPTIM_IER_ARRMIE;
 	lptim->CFGR &= ~LPTIM_CFGR_CKSEL;
@@ -33,21 +36,20 @@ void lptim_init(LPTIM_TypeDef* lptim) {
 	lptim->CFGR |= LPTIM_CFGR_PRESC_0 | LPTIM_CFGR_PRESC_1 | LPTIM_CFGR_PRESC_2;
 
 	lptim->CFGR &= ~LPTIM_CFGR_TRIGEN;
-	lptim->CR |= LPTIM_CR_CNTSTRT;
-	lptim->CR &= ~LPTIM_CR_SNGSTRT;
-
 
 	// enable after doing ier and cfgr and need to wait 2 clock cycles
 	lptim->CR |= LPTIM_CR_ENABLE;
-	while((lptim->CR & LPTIM_CR_ENABLE) != 0) {}
+	for (volatile int i = 0; i < 30; i++);
+	lptim->CR |= LPTIM_CR_CNTSTRT;
+	lptim->CR &= ~LPTIM_CR_SNGSTRT;
 }
 
 void lptim_reset(LPTIM_TypeDef* lptim) {
-	lptim->CNT &= ~LPTIM_CNT_CNT;
+//	lptim->CNT &= ~LPTIM_CNT_CNT;
 }
 
 void lptim_set_sec(LPTIM_TypeDef* lptim, uint16_t period_sec) {
-	lptim->CNT &= ~LPTIM_CNT_CNT;
+//	lptim->CNT &= ~LPTIM_CNT_CNT;
 	lptim->CMP = 30000;
 	lptim->ARR = period_sec * 256;
 }
