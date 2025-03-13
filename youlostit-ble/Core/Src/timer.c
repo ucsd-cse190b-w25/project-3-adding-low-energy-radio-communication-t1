@@ -12,7 +12,7 @@ void timer_init(TIM_TypeDef* timer)
 {
 	// Give power to the timer
 	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
-	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
+//	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
 
 	// Enable interrupts
 	NVIC_EnableIRQ(TIM2_IRQn);
@@ -34,12 +34,6 @@ void timer_init(TIM_TypeDef* timer)
 //	timer->PSC = 3999; // adjust for 4mhz clock
 	timer->PSC = 7999; // adjust it for an 8mhz clock
 //	timer->PSC = 99; // adjust for 100 khz clock
-//	timer->PSC = 199; // adjust for 200khz clock
-//	timer->PSC = 399; // adjust for 400khz clock
-//	timer->PSC = 799; // adjust for 800khz clock (minimum working)
-//	timer->PSC = 999; // adjust for 1mhz clock
-//	timer->PSC = 1999; // adjust for 2mhz clock
-//	timer->PSC = 19999; //
 
 	// reset the status of the timer
 	timer->SR &= ~TIM_SR_UIF;

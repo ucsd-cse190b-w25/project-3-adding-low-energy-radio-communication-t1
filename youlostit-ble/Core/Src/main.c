@@ -23,6 +23,9 @@
  * 172, 165, 166, 405,
  * https://community.st.com/t5/mems-sensors/lsm6dsl-interrupt-generation-interrupts-constantly-fire/td-p/616753
  * https://medium.com/@yashodhalakshana/stm32l4-low-power-modes-with-different-wake-up-sources-260b56c48933
+ * https://cseweb.ucsd.edu/classes/fa23/cse190-e/docs/stm32l4X-reference-manual.pdf#page=1198
+ *
+ *
  */
 #include "ble.h"
 
@@ -51,6 +54,7 @@ static void MX_GPIO_Init(void);
 static void MX_SPI3_Init(void);
 void you_lost_it(int16_t* xyz);
 void new_lost_it(void);
+void LPTIM1_init(void);
 
 #define OFFSET_THRESH 4000
 
@@ -70,6 +74,7 @@ static volatile uint8_t lowbit = 0x1;
 static volatile int sendMessage = 0;
 static volatile int checkAccel = 0;
 static volatile int readAccel = 0;
+static volatile int timeTillLost = 10;
 
 
 /**
@@ -93,14 +98,9 @@ int main(void)
   timer_init(TIM2);
   timer_init(TIM3);
   timer_set_ms(TIM3, 10000); // 10 second delay
-  timer_set_ms(TIM2, 5000);
-//  timer_set_arr(TIM3, 1600);
-//  timer_set_arr(TIM2, 160);
+  timer_set_ms(TIM2, 7000);
 
   lsm6dsl_init();
-//  printf("work\n");
-  // enable exti event generating things for accelerometer
-  // accelerometer is EXTI11
 //  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 //  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
 
@@ -123,8 +123,6 @@ int main(void)
   {
 	  RCC->CR &= ~RCC_CR_MSIRANGE;
 	  RCC->CR |= RCC_CR_MSIRANGE_0;
-//	  timer_set_arr(TIM3, 50);
-//	  timer_set_arr(TIM2, 5);
 	  timer_set_presc(TIM2, 99);
 	  timer_set_presc(TIM3, 99);
 	  PWR->CR1 |= PWR_CR1_LPR;
@@ -134,10 +132,9 @@ int main(void)
 		  while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		  RCC->CR &= ~RCC_CR_MSIRANGE;
 		  RCC->CR |= RCC_CR_MSIRANGE_7;
-//		  timer_set_arr(TIM3, 4000);
-//		  timer_set_arr(TIM2, 400);
 		  timer_set_presc(TIM2, 7999);
 		  timer_set_presc(TIM3, 7999);
+//		  ble_init();
 		  catchBLE();
 	  }else{
 		  if (checkAccel) {
@@ -190,8 +187,6 @@ void you_lost_it(int16_t* xyz){
 		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		RCC->CR &= ~RCC_CR_MSIRANGE;
 		RCC->CR |= RCC_CR_MSIRANGE_7;
-//		timer_set_arr(TIM3, 4000);
-//		timer_set_arr(TIM2, 400);
 		timer_set_presc(TIM2, 7999);
 		timer_set_presc(TIM3, 7999);
 		disconnectBLE();
@@ -202,15 +197,13 @@ void you_lost_it(int16_t* xyz){
 		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		RCC->CR &= ~RCC_CR_MSIRANGE;
 		RCC->CR |= RCC_CR_MSIRANGE_7;
-//		timer_set_arr(TIM3, 4000);
-//		timer_set_arr(TIM2, 400);
 		timer_set_presc(TIM2, 7999);
 		timer_set_presc(TIM3, 7999);
 		setDiscoverability(1);
 //		leds_set(lights);
 		unsigned char message[20] = ""; //21 characters seems like the max
 		if (sendMessage) {
-			snprintf((char*)message, 20, "Secs lost %d", minsLost-10);
+			snprintf((char*)message, 20, "Secs lost %d", minsLost-timeTillLost);
 			updateCharValue(NORDIC_UART_SERVICE_HANDLE, READ_CHAR_HANDLE, 0, sizeof(message)-1, message);
 			sendMessage = 0;
 		}
@@ -264,7 +257,7 @@ void TIM2_IRQHandler(void)
 		TIM2->SR &= ~TIM_SR_UIF;
 		return;
 	}
-	minsLost+= 5;
+	minsLost+= 7;
 //	for (int i = 0; i < 3; i++) {
 //		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
 //		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
@@ -274,6 +267,10 @@ void TIM2_IRQHandler(void)
 //	leds_set(1);
 	led_interupt = 1;
 	checkAccel = 1;
+//	if (minsLost >= timeTillLost && minsLost % 10) {
+//		sendMessage = 1;
+////		leds_set(3);
+//	}
 	// Reset the interrupt bit
 	TIM2->SR &= ~TIM_SR_UIF;
 }
@@ -287,10 +284,11 @@ void TIM3_IRQHandler(void) {
 	}
 //	lights = led1[on_off] + led2[on_off];
 //	on_off = (on_off + 1) % 16;
-//	leds_set(2);
+	leds_set(2);
 	sendMessage = 1;
 	TIM3->SR &= ~TIM_SR_UIF;
 }
+
 void EXTI15_10_IRQHandler(void) {
 //    leds_set(3);
 
@@ -307,6 +305,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		readAccel = 1;
 //		leds_set(3);
 	}
+}
+
+void LPTIM1_init() {
+
 }
 
 void check_clocks() {
