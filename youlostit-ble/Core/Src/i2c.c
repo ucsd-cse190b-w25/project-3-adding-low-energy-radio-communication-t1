@@ -132,6 +132,8 @@ void i2c_init() {
 }
 
 uint8_t i2c_transaction(uint8_t address, uint8_t dir, uint8_t* data, uint8_t len) {
+	RCC->APB1ENR1 |= RCC_APB1ENR1_I2C2EN;
+
 	while ((I2C2->ISR & I2C_ISR_BUSY)) {}
 	I2C2->CR2 |= I2C_CR2_AUTOEND;
 	I2C2->CR2 &= ~I2C_CR2_ADD10;
@@ -185,5 +187,7 @@ uint8_t i2c_transaction(uint8_t address, uint8_t dir, uint8_t* data, uint8_t len
 	// clear out address by setting ADDRCF bit
 //	I2C2->ISR |= I2C_ICR_ADDRCF;
 	//I2C2->CR2 &= ~I2C2->CR2;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_I2C2EN;
+
 	return 0;
 }

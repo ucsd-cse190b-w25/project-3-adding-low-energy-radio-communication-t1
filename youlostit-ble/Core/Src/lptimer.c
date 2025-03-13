@@ -31,6 +31,8 @@ void lptim_init(LPTIM_TypeDef* lptim) {
 	// enable interrupts from auto reload match
 	lptim->IER |= LPTIM_IER_ARRMIE;
 	lptim->CFGR &= ~LPTIM_CFGR_CKSEL;
+	lptim->CFGR &= ~LPTIM_CFGR_COUNTMODE;
+
 	// Set the Prescaler
 	lptim->CFGR &= ~LPTIM_CFGR_PRESC;
 	lptim->CFGR |= LPTIM_CFGR_PRESC_0 | LPTIM_CFGR_PRESC_1 | LPTIM_CFGR_PRESC_2;
@@ -50,6 +52,6 @@ void lptim_reset(LPTIM_TypeDef* lptim) {
 
 void lptim_set_sec(LPTIM_TypeDef* lptim, uint16_t period_sec) {
 //	lptim->CNT &= ~LPTIM_CNT_CNT;
-	lptim->CMP = 30000;
-	lptim->ARR = period_sec * 256;
+//	lptim->CMP = 30000;
+	lptim->ARR = (period_sec * 256) - 1;
 }
