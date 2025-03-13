@@ -20,7 +20,9 @@
 /* Includes ------------------------------------------------------------------*/
 //#include "ble_commands.h"
 /*
- * 172, 165, 166, 405,
+ * 172, 165, 166, 405, 264 LPTIM1SMEN,
+ * 261 for disabling gpio while asleep
+ * 1195 for lptim enable
  * https://community.st.com/t5/mems-sensors/lsm6dsl-interrupt-generation-interrupts-constantly-fire/td-p/616753
  * https://medium.com/@yashodhalakshana/stm32l4-low-power-modes-with-different-wake-up-sources-260b56c48933
  * https://cseweb.ucsd.edu/classes/fa23/cse190-e/docs/stm32l4X-reference-manual.pdf#page=1198
@@ -35,6 +37,7 @@
 #include "leds.h"
 #include "timer.h"
 #include "lsm6dsl.h"
+#include "lptimer.h"
 
 int dataAvailable = 0;
 
@@ -65,7 +68,7 @@ static int led1[] = {0,1,0,1, 0,0,1,1,0,0,0,0, 0,0,0,0};
 static volatile int interruptProcs = 0;
 static volatile int TIM2start = 0;
 static volatile int TIM3start = 0;
-static volatile int led_interupt = 0;
+static volatile int led_interrupt = 0;
 static volatile int on_off = 0;
 static volatile int minsLost = 0;
 static volatile int lights = 0;
@@ -95,10 +98,12 @@ int main(void)
 
   // Our peripheral configurables
   leds_init();
-  timer_init(TIM2);
-  timer_init(TIM3);
-  timer_set_ms(TIM3, 10000); // 10 second delay
-  timer_set_ms(TIM2, 7000);
+  lptim_init(LPTIM1);
+  lptim_set_sec(LPTIM1, 1);
+//  timer_init(TIM2);
+//  timer_init(TIM3);
+//  timer_set_ms(TIM3, 10000); // 10 second delay
+//  timer_set_ms(TIM2, 7000);
 
   lsm6dsl_init();
 //  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -123,8 +128,8 @@ int main(void)
   {
 	  RCC->CR &= ~RCC_CR_MSIRANGE;
 	  RCC->CR |= RCC_CR_MSIRANGE_0;
-	  timer_set_presc(TIM2, 99);
-	  timer_set_presc(TIM3, 99);
+//	  timer_set_presc(TIM2, 99);
+//	  timer_set_presc(TIM3, 99);
 	  PWR->CR1 |= PWR_CR1_LPR;
 
 	  if(!nonDiscoverable && HAL_GPIO_ReadPin(BLE_INT_GPIO_Port,BLE_INT_Pin)){
@@ -132,8 +137,8 @@ int main(void)
 		  while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		  RCC->CR &= ~RCC_CR_MSIRANGE;
 		  RCC->CR |= RCC_CR_MSIRANGE_7;
-		  timer_set_presc(TIM2, 7999);
-		  timer_set_presc(TIM3, 7999);
+//		  timer_set_presc(TIM2, 7999);
+//		  timer_set_presc(TIM3, 7999);
 //		  ble_init();
 		  catchBLE();
 	  }else{
@@ -151,8 +156,8 @@ int main(void)
 //	  __enable_irq();
 	  HAL_SuspendTick();
 //	  PWR->CR1 |= PWR_CR1_LPMS_STOP2;
-	  __WFI();
-//	  HAL_PWREx_EnterSTOP2Mode(PWR_SLEEPENTRY_WFI);
+//	  __WFI();
+	  HAL_PWREx_EnterSTOP2Mode(PWR_SLEEPENTRY_WFI);
 //	  leds_set(1);
 	  HAL_ResumeTick();
 
@@ -177,28 +182,29 @@ void you_lost_it(int16_t* xyz){
     //leds_set(lights);
 	// keep track of how many times that it moved
 	if (diff_x + diff_y + diff_z >= OFFSET_THRESH) { // This is checking for when it moves
-		timer_reset(TIM2);
-		timer_reset(TIM3);
+		lptim_reset(LPTIM1);
+//		timer_reset(TIM2);
+//		timer_reset(TIM3);
 		sendMessage = 0;
-		led_interupt = 0;
+		led_interrupt = 0;
 		minsLost = 0;
 //		leds_set(0);
 		PWR->CR1 &= ~PWR_CR1_LPR;
 		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		RCC->CR &= ~RCC_CR_MSIRANGE;
 		RCC->CR |= RCC_CR_MSIRANGE_7;
-		timer_set_presc(TIM2, 7999);
-		timer_set_presc(TIM3, 7999);
+//		timer_set_presc(TIM2, 7999);
+//		timer_set_presc(TIM3, 7999);
 		disconnectBLE();
 		setDiscoverability(0);
 	}
-	if (led_interupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
+	if (led_interrupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
 		PWR->CR1 &= ~PWR_CR1_LPR;
 		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
 		RCC->CR &= ~RCC_CR_MSIRANGE;
 		RCC->CR |= RCC_CR_MSIRANGE_7;
-		timer_set_presc(TIM2, 7999);
-		timer_set_presc(TIM3, 7999);
+//		timer_set_presc(TIM2, 7999);
+//		timer_set_presc(TIM3, 7999);
 		setDiscoverability(1);
 //		leds_set(lights);
 		unsigned char message[20] = ""; //21 characters seems like the max
@@ -217,7 +223,7 @@ void new_lost_it() {
 		timer_reset(TIM2);
 		timer_reset(TIM3);
 		sendMessage = 0;
-		led_interupt = 0;
+		led_interrupt = 0;
 		minsLost = 0;
 //		leds_set(0);
 		PWR->CR1 &= ~PWR_CR1_LPR;
@@ -231,7 +237,7 @@ void new_lost_it() {
 		readAccel = 0;
 	}
 
-	if (led_interupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
+	if (led_interrupt && minsLost >= 10) { // This is when it is lost for 60s (10 seconds)
 		//HAL_Delay(10);
 		PWR->CR1 &= ~PWR_CR1_LPR;
 		while ((PWR->SR2 & PWR_SR2_REGLPF) != 0) {}
@@ -250,43 +256,54 @@ void new_lost_it() {
 	}
 }
 // Timer to keep track of how long it has been lost and set the blinking
-void TIM2_IRQHandler(void)
-{
-	if (TIM2start == 0) {
-		TIM2start++;
-		TIM2->SR &= ~TIM_SR_UIF;
-		return;
-	}
-	minsLost+= 7;
-//	for (int i = 0; i < 3; i++) {
-//		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
-//		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
+//void TIM2_IRQHandler(void)
+//{
+//	if (TIM2start == 0) {
+//		TIM2start++;
+//		TIM2->SR &= ~TIM_SR_UIF;
+//		return;
 //	}
-//	lights = led1[on_off] + led2[on_off];
-//	on_off = (on_off + 1) % 16;
-//	leds_set(1);
-	led_interupt = 1;
-	checkAccel = 1;
-//	if (minsLost >= timeTillLost && minsLost % 10) {
-//		sendMessage = 1;
-////		leds_set(3);
-//	}
-	// Reset the interrupt bit
-	TIM2->SR &= ~TIM_SR_UIF;
-}
+//	minsLost+= 7;
+////	for (int i = 0; i < 3; i++) {
+////		led1[15-i] = (minsLost & (lowbit << 2*i)) ? 1 : 0;
+////		led2[15-i] = (minsLost & (highbit << 2*i)) ? 2 : 0;
+////	}
+////	lights = led1[on_off] + led2[on_off];
+////	on_off = (on_off + 1) % 16;
+////	leds_set(1);
+//	led_interrupt = 1;
+//	checkAccel = 1;
+////	if (minsLost >= timeTillLost && (minsLost % 10) == 0) {
+////		sendMessage = 1;
+//////		leds_set(3);
+////	}
+//	// Reset the interrupt bit
+//	TIM2->SR &= ~TIM_SR_UIF;
+//}
 
 // set the leds blinking pattern
-void TIM3_IRQHandler(void) {
-	if (!TIM3start) {
-		TIM3start = 1;
-		TIM3->SR &= ~TIM_SR_UIF;
-		return;
+//void TIM3_IRQHandler(void) {
+//	if (!TIM3start) {
+//		TIM3start = 1;
+//		TIM3->SR &= ~TIM_SR_UIF;
+//		return;
+//	}
+////	lights = led1[on_off] + led2[on_off];
+////	on_off = (on_off + 1) % 16;
+//	leds_set(2);
+//	sendMessage = 1;
+//	TIM3->SR &= ~TIM_SR_UIF;
+//}
+
+void LPTIM1_IRQHandler(void) {
+	leds_set(1);
+	minsLost+= 1;
+	led_interrupt = 1;
+	checkAccel = 1;
+	if (minsLost >= timeTillLost && ((minsLost % 10) == 0)) {
+		sendMessage = 1;
 	}
-//	lights = led1[on_off] + led2[on_off];
-//	on_off = (on_off + 1) % 16;
-	leds_set(2);
-	sendMessage = 1;
-	TIM3->SR &= ~TIM_SR_UIF;
+	LPTIM1->ISR |= LPTIM_ICR_ARRMCF;
 }
 
 void EXTI15_10_IRQHandler(void) {
@@ -307,9 +324,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
-void LPTIM1_init() {
-
-}
 
 void check_clocks() {
     uint32_t sysclk = HAL_RCC_GetSysClockFreq();  // Get SYSCLK frequency

@@ -12,7 +12,7 @@ void timer_init(TIM_TypeDef* timer)
 {
 	// Give power to the timer
 	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
-//	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
+	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
 
 	// Enable interrupts
 	NVIC_EnableIRQ(TIM2_IRQn);
