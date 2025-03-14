@@ -4,7 +4,7 @@
 ../Core/Src/main.c:142:6:you_lost_it	5
 ../Core/Src/main.c:254:6:LPTIM1_IRQHandler	3
 ../Core/Src/main.c:266:6:disableThings	1
-../Core/Src/main.c:376:6:SystemClock_Config	4
-../Core/Src/main.c:423:13:MX_SPI3_Init	2
-../Core/Src/main.c:463:13:MX_GPIO_Init	1
-../Core/Src/main.c:522:6:Error_Handler	1
+../Core/Src/main.c:370:6:SystemClock_Config	4
+../Core/Src/main.c:417:13:MX_SPI3_Init	2
+../Core/Src/main.c:457:13:MX_GPIO_Init	1
+../Core/Src/main.c:516:6:Error_Handler	1
