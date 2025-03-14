@@ -58,12 +58,13 @@ static void MX_SPI3_Init(void);
 void you_lost_it(int16_t* xyz);
 void new_lost_it(void);
 void LPTIM1_init(void);
+void disableThings(void);
 
 #define OFFSET_THRESH 4000
 
 // Patterns for each LED
-static int led2[] = {2,0,2,0, 0,2,0,0,0,0,2,2, 0,0,0,0};
-static int led1[] = {0,1,0,1, 0,0,1,1,0,0,0,0, 0,0,0,0};
+//static int led2[] = {2,0,2,0, 0,2,0,0,0,0,2,2, 0,0,0,0};
+//static int led1[] = {0,1,0,1, 0,0,1,1,0,0,0,0, 0,0,0,0};
 
 static volatile int interruptProcs = 0;
 static volatile int TIM2start = 0;
@@ -77,7 +78,7 @@ static volatile uint8_t lowbit = 0x1;
 static volatile int sendMessage = 0;
 static volatile int checkAccel = 0;
 static volatile int readAccel = 0;
-static volatile int timeTillLost = 10;
+static volatile int timeTillLost = 60;
 
 
 /**
@@ -88,13 +89,15 @@ int main(void)
 {
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  disableThings();
   /* Configure the system clock */
   SystemClock_Config();
 
+//  disableThings();
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI3_Init();
+
 
   // Our peripheral configurables
 //  leds_init();
@@ -260,6 +263,93 @@ void LPTIM1_IRQHandler(void) {
 	LPTIM1->ICR |= LPTIM_ICR_ARRMCF;
 }
 
+void disableThings(void) {
+	RCC->CR &= ~RCC_CR_CSSON;
+	RCC->CR &= ~RCC_CR_HSEON;
+	RCC->CR &= ~RCC_CR_HSIASFS;
+	RCC->CR &= ~RCC_CR_HSEON;
+	RCC->CR &= ~RCC_CR_HSIKERON;
+	RCC->CR &= ~RCC_CR_HSION;
+	RCC->CR &= ~RCC_CR_MSIPLLEN;
+
+	RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLREN;
+	RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLQEN;
+	RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLPEN;
+
+	RCC->PLLSAI1CFGR &= ~RCC_PLLSAI1CFGR_PLLSAI1REN;
+	RCC->PLLSAI1CFGR &= ~RCC_PLLSAI1CFGR_PLLSAI1QEN;
+	RCC->PLLSAI1CFGR &= ~RCC_PLLSAI1CFGR_PLLSAI1PEN;
+
+	RCC->PLLSAI2CFGR &= ~RCC_PLLSAI2CFGR_PLLSAI2REN;
+	RCC->PLLSAI2CFGR &= ~RCC_PLLSAI2CFGR_PLLSAI2PEN;
+
+	RCC->CIER &= ~RCC_CIER_HSIRDYIE;
+	RCC->CIER &= ~RCC_CIER_LSERDYIE;
+	RCC->CIER &= ~RCC_CIER_LSECSSIE;
+	RCC->CIER &= ~RCC_CIER_PLLSAI2RDYIE;
+	RCC->CIER &= ~RCC_CIER_PLLSAI1RDYIE;
+	RCC->CIER &= ~RCC_CIER_PLLRDYIE;
+	RCC->CIER &= ~RCC_CIER_HSERDYIE;
+
+	RCC->AHB1ENR &= ~RCC_AHB1ENR_TSCEN;
+	RCC->AHB1ENR &= ~RCC_AHB1ENR_CRCEN;
+	RCC->AHB1ENR &= ~RCC_AHB1ENR_DMA2EN;
+	RCC->AHB1ENR &= ~RCC_AHB1ENR_DMA1EN;
+
+	// GPIOD is lsm6, GPIOC is ble SPI, GPIOB is lsm6
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_RNGEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_ADCEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOHEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOGEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOFEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOEEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOHEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOAEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIODEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOCEN;
+	RCC->AHB2ENR &= ~RCC_AHB2ENR_GPIOBEN;
+
+	RCC->AHB3ENR &= ~RCC_AHB3ENR_QSPIEN;
+	RCC->AHB3ENR &= ~RCC_AHB3ENR_FMCEN;
+
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_OPAMPEN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_DAC1EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_CAN1EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_I2C3EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_I2C1EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_UART5EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_UART4EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_USART3EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_USART2EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_SPI2EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_WWDGEN;
+
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM7EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM6EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM5EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM4EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM3EN;
+	RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM2EN;
+
+	RCC->APB1ENR2 &= ~RCC_APB1ENR2_LPTIM2EN;
+	RCC->APB1ENR2 &= ~RCC_APB1ENR2_SWPMI1EN;
+	RCC->APB1ENR2 &= ~RCC_APB1ENR2_LPUART1EN;
+
+	RCC->APB2ENR &= ~RCC_APB2ENR_DFSDM1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_SAI2EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_SAI1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_DFSDM1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_TIM17EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_TIM16EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_TIM15EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_USART1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_TIM8EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_SPI1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_TIM1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_SDMMC1EN;
+	RCC->APB2ENR &= ~RCC_APB2ENR_FWEN;
+}
+
 //void EXTI15_10_IRQHandler(void) {
 ////    leds_set(3);
 //
@@ -277,38 +367,6 @@ void LPTIM1_IRQHandler(void) {
 ////		leds_set(3);
 //	}
 //}
-
-
-//void check_clocks() {
-//    uint32_t sysclk = HAL_RCC_GetSysClockFreq();  // Get SYSCLK frequency
-//    uint32_t hclk = HAL_RCC_GetHCLKFreq();        // Get AHB bus frequency
-//    uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();      // Get APB1 peripheral frequency
-//    uint32_t pclk2 = HAL_RCC_GetPCLK2Freq();      // Get APB2 peripheral frequency
-//
-//    printf("System Clock (SYSCLK): %lu Hz\n", sysclk);
-//    printf("AHB Clock (HCLK): %lu Hz\n", hclk);
-//    printf("APB1 Clock (PCLK1): %lu Hz\n", pclk1);
-//    printf("APB2 Clock (PCLK2): %lu Hz\n", pclk2);
-//
-//    if (__HAL_RCC_GET_FLAG(RCC_FLAG_MSIRDY)) {
-//        printf("MSI is enabled\n");
-//    }
-//    if (__HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY)) {
-//        printf("HSI16 is enabled\n");
-//    }
-//    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSIRDY)) {
-//        printf("LSI is enabled\n");
-//    }
-//    if (__HAL_RCC_GET_FLAG(RCC_FLAG_HSERDY)) {
-//        printf("HSE is enabled\n");
-//    }
-//    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSERDY)) {
-//        printf("LSE is enabled\n");
-//    }
-//
-//}
-
-
 
 /**
   * @brief System Clock Configuration
